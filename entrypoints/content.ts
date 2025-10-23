@@ -6,7 +6,17 @@ import { sha256 } from '@/utils/sha'
 type Pair<T, U> = [T, U]
 
 // Constants:
-const DEFAULT_BLOCKLIST_PREFERENCES: string[] = []
+const BASE_ENDPOINT = import.meta.env.WXT_ENVIRONMENT === 'local' ? 'http://localhost:8080/api' : '//slop-blocker.diragb.dev/api'
+const ENDPOINTS = {
+  blocklists: (blocklistID: string) => `${BASE_ENDPOINT}/blocklists/${blocklistID}`,
+  blocklistHashes: (blocklistID: string) => `${BASE_ENDPOINT}/blocklist-hashes/${blocklistID}`,
+}
+const DEFAULT_BLOCKLIST_PREFERENCES: string[] = [
+  'ai-maximalism',
+  'aislop',
+  'engagement-farming',
+  'low-effort',
+]
 
 // Functions:
 const getBlocklistPreferences = () => get<string[]>({
@@ -37,7 +47,7 @@ const getBlocklistHashes = (blocklistIDs: string[]) => {
     const blocklistHash = get<string | null>({
       key: KEYS.blocklistHash(blocklistID)
     })
-    blocklistHashes.set(blocklistID, blocklistHash.value)
+    blocklistHashes.set(blocklistID, blocklistHash.value === null ? '' : JSON.parse(blocklistHash.value))
   }
 
   return blocklistHashes
@@ -60,27 +70,19 @@ const getBlocklist = (blocklistID: string) => get<string[]>({
   defaultValue: [],
   onNull: () => set({
     key: KEYS.blocklist(blocklistID),
-    value: [],
+    value: '',
   }),
-  processor: blocklistUsernames => {
-    const parsedBlocklistUsernames = JSON.parse(blocklistUsernames)
-    if (typeof parsedBlocklistUsernames === 'object' && Array.isArray(parsedBlocklistUsernames)) {
-      return parsedBlocklistUsernames as string[]
-    } else {
-      return null
-    }
-  }
+  processor: blocklistUsernames => blocklistUsernames.slice(1, blocklistUsernames.length - 1).split(',')
 })
 
 const setBlocklist = (blocklistID: string, blocklist: string[]) => set({
   key: KEYS.blocklist(blocklistID),
-  value: blocklist,
+  value: blocklist.join(','),
 })
-
 
 const fetchBlocklistHashFromRemote = async (blocklistID: string): Promise<string | null> => {
   try {
-    const response = await fetch(`https://slop-blocker.diragb.dev/blocklist-hashes/${blocklistID}`)
+    const response = await fetch(ENDPOINTS.blocklistHashes(blocklistID))
     const blocklistHash = await response.text()
     return blocklistHash
   } catch (error) {
@@ -91,8 +93,8 @@ const fetchBlocklistHashFromRemote = async (blocklistID: string): Promise<string
 
 const fetchBlocklistFromRemote = async (blocklistID: string): Promise<string[]> => {
   try {
-    const response = await fetch(`https://slop-blocker.diragb.dev/blocklists/${blocklistID}`)
-    const blocklist = (await response.text()).split(',')
+    const response = await fetch(ENDPOINTS.blocklists(blocklistID))
+    const blocklist = (await response.text()).split(',').filter(blocklistUsername => blocklistUsername.length > 0)
     return blocklist
   } catch (error) {
     console.warn(`Encountered an error while attempting to fetch the blocklist from remote for "${blocklistID}":`, error)
@@ -170,6 +172,7 @@ const initialize = async () => {
   const { value: blocklistPreferences, wasNull: wasBlocklistPreferencesNull } = getBlocklistPreferences()
   const isFreshInstall = wasBlocklistPreferencesNull === 'yes' || wasBlocklistPreferencesNull === 'indeterminate'
   const unifiedBlocklist = await getUnifiedBlocklist(blocklistPreferences, isFreshInstall)
+  console.log(unifiedBlocklist)
   // TODO: use the unifiedBlocklist later on..
 }
 
