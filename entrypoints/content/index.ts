@@ -1,85 +1,19 @@
 // Packages:
-import { KEYS, get, set } from '@/utils/localStorage'
-import { sha256 } from '@/utils/sha'
+import Adapter from './adapter'
 
 // Typescript:
-type Pair<T, U> = [T, U]
+import type { Pair } from '@/types/helpers'
 
 // Constants:
+const adapter = new Adapter()
 const BASE_ENDPOINT = import.meta.env.WXT_ENVIRONMENT === 'local' ? 'http://localhost:8080/api' : '//slop-blocker.diragb.dev/api'
 const ENDPOINTS = {
   blocklists: (blocklistID: string) => `${BASE_ENDPOINT}/blocklists/${blocklistID}`,
   blocklistHashes: (blocklistID: string) => `${BASE_ENDPOINT}/blocklist-hashes/${blocklistID}`,
 }
-const DEFAULT_BLOCKLIST_PREFERENCES: string[] = [
-  'ai-maximalism',
-  'aislop',
-  'engagement-farming',
-  'low-effort',
-]
+
 
 // Functions:
-const getBlocklistPreferences = () => get<string[]>({
-  key: KEYS.blocklistPreferences,
-  defaultValue: DEFAULT_BLOCKLIST_PREFERENCES,
-  onNull: () => set({
-    key: KEYS.blocklistPreferences,
-    value: DEFAULT_BLOCKLIST_PREFERENCES,
-  }),
-  processor: preferences => {
-    const parsedPreferences = JSON.parse(preferences)
-    if (typeof parsedPreferences === 'object' && Array.isArray(parsedPreferences)) {
-      return parsedPreferences as string[]
-    } else {
-      return null
-    }
-  }
-})
-
-const setBlocklistPreferences = (blocklistIDs: string[]) => set({
-  key: KEYS.blocklistPreferences,
-  value: blocklistIDs,
-})
-
-const getBlocklistHashes = (blocklistIDs: string[]) => {
-  const blocklistHashes: Map<string, string | null> = new Map()
-  for (const blocklistID of blocklistIDs) {
-    const blocklistHash = get<string | null>({
-      key: KEYS.blocklistHash(blocklistID)
-    })
-    blocklistHashes.set(blocklistID, blocklistHash.value === null ? '' : JSON.parse(blocklistHash.value))
-  }
-
-  return blocklistHashes
-}
-
-const setBlocklistHash = async (blocklistID: string, blocklist: string[]) => {
-  try {
-    const blocklistHash = await sha256(blocklist.join(','))
-    set({
-      key: KEYS.blocklistHash(blocklistID),
-      value: blocklistHash,
-    })
-  } catch (error) {
-    console.warn(`Encountered an error while attempting to generate blocklist hash for key "${KEYS.blocklistHash(blocklistID)}":`, error)
-  }
-}
-
-const getBlocklist = (blocklistID: string) => get<string[]>({
-  key: KEYS.blocklist(blocklistID),
-  defaultValue: [],
-  onNull: () => set({
-    key: KEYS.blocklist(blocklistID),
-    value: '',
-  }),
-  processor: blocklistUsernames => blocklistUsernames.slice(1, blocklistUsernames.length - 1).split(',')
-})
-
-const setBlocklist = (blocklistID: string, blocklist: string[]) => set({
-  key: KEYS.blocklist(blocklistID),
-  value: blocklist.join(','),
-})
-
 const fetchBlocklistHashFromRemote = async (blocklistID: string): Promise<string | null> => {
   try {
     const response = await fetch(ENDPOINTS.blocklistHashes(blocklistID))
@@ -103,7 +37,10 @@ const fetchBlocklistFromRemote = async (blocklistID: string): Promise<string[]> 
 }
 
 const getOutOfSyncBlocklists = async (blocklistIDs: string[]): Promise<string[]> => {
-  const blocklistHashes = getBlocklistHashes(blocklistIDs)
+  const { status, payload } = await adapter.execute('getBlocklistHashes', { blocklistIDs })
+  if (!status) throw payload
+  const blocklistHashes = payload
+
   const fetchedBlocklistHashes = new Map<string, string | null>()
   const blocklistsOutOfSyncWithRemote: string[] = []
 
@@ -152,14 +89,18 @@ const getUnifiedBlocklist = async (blocklistIDs: string[], isFreshInstall: boole
     const blocklistID = blocklistsToFetch[i]
     fetchedBlocklists.set(blocklistID, resolvedBlocklists[i])
     const blocklist = resolvedBlocklists[i].flat().sort((a, b) => String(a).localeCompare(String(b)))
-    setBlocklist(blocklistID, blocklist)
-    setBlocklistHash(blocklistID, blocklist)
+    const { status: setBlocklistStatus, payload: setBlocklistPayload } = await adapter.execute('setBlocklist', { blocklistID, blocklist })
+    if (!setBlocklistStatus) throw setBlocklistPayload
+    const { status: setBlocklistHashStatus, payload: setBlocklistHashPayload } = await adapter.execute('setBlocklistHash', { blocklistID, blocklist })
+    if (!setBlocklistHashStatus) throw setBlocklistHashPayload
   }
   const flatResolvedBlocklists = resolvedBlocklists.flat()
 
   const flatCachedBlocklists: string[] = []
   for (const blocklistID of cachedBlocklistIDs) {
-    const { value: blocklist } = getBlocklist(blocklistID)
+    const { status, payload } = await adapter.execute('getBlocklist', { blocklistID })
+    if (!status) throw payload
+    const { payload: { value: blocklist } } = payload
     cachedBlocklists.set(blocklistID, blocklist)
     flatCachedBlocklists.push(...blocklist)
   }
@@ -169,7 +110,9 @@ const getUnifiedBlocklist = async (blocklistIDs: string[], isFreshInstall: boole
 }
 
 const initialize = async () => {
-  const { value: blocklistPreferences, wasNull: wasBlocklistPreferencesNull } = getBlocklistPreferences()
+  const { status, payload } = await adapter.execute('getBlocklistPreferences', undefined)
+  if (!status) throw payload
+  const { payload: { value: blocklistPreferences, wasNull: wasBlocklistPreferencesNull } } = payload
   const isFreshInstall = wasBlocklistPreferencesNull === 'yes' || wasBlocklistPreferencesNull === 'indeterminate'
   const unifiedBlocklist = await getUnifiedBlocklist(blocklistPreferences, isFreshInstall)
   console.log(unifiedBlocklist)
