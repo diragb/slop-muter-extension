@@ -1,5 +1,6 @@
 // Packages:
 import Adapter from './adapter'
+import xonsole from '@/utils/xonsole'
 
 // Typescript:
 import type { Pair } from '@/types/helpers'
@@ -20,7 +21,7 @@ const fetchBlocklistHashFromRemote = async (blocklistID: string): Promise<string
     const blocklistHash = await response.text()
     return blocklistHash
   } catch (error) {
-    console.warn(`Encountered an error while attempting to fetch the blocklist hash from remote for "${blocklistID}":`, error)
+    xonsole.warn('fetchBlocklistHashFromRemote', error as Error, { blocklistID }, 'fetch the blocklist hash from remote by calling')
     return null
   }
 }
@@ -31,7 +32,7 @@ const fetchBlocklistFromRemote = async (blocklistID: string): Promise<string[]> 
     const blocklist = (await response.text()).split(',').filter(blocklistUsername => blocklistUsername.length > 0)
     return blocklist
   } catch (error) {
-    console.warn(`Encountered an error while attempting to fetch the blocklist from remote for "${blocklistID}":`, error)
+    xonsole.warn('fetchBlocklistFromRemote', error as Error, { blocklistID }, 'fetch the blocklist hash from remote by calling')
     return []
   }
 }
