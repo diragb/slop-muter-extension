@@ -1,5 +1,5 @@
 // Packages:
-import Adapter from './adapter'
+import Adapter from '@/utils/adapter'
 import xonsole from '@/utils/xonsole'
 
 // Typescript:
@@ -38,7 +38,6 @@ const ENDPOINTS = {
 // Variables:
 let _unifiedBlocklist = new Set<string>()
 
-
 // Functions:
 const fetchBlocklistHashFromRemote = async (blocklistID: string): Promise<string | null> => {
   try {
@@ -76,7 +75,7 @@ const fetchBlocklistsMapFromRemote = async (): Promise<Record<string, { name: st
 const getOutOfSyncBlocklists = async (blocklistIDs: string[]): Promise<string[]> => {
   const { status, payload } = await adapter.execute('getBlocklistHashes', { blocklistIDs })
   if (!status) throw payload
-  const blocklistHashes = payload
+  const blocklistHashes = new Map<string, string | null>(Object.entries(payload))
 
   const fetchedBlocklistHashes = new Map<string, string | null>()
   const blocklistsOutOfSyncWithRemote: string[] = []
@@ -146,6 +145,8 @@ const getUnifiedBlocklist = async (blocklistIDs: string[], isFreshInstall: boole
   return new Set(unifiedBlocklists.sort((blocklistUsernameA, blocklistUsernameB) => String(blocklistUsernameA).localeCompare(String(blocklistUsernameB))))
 }
 
+// Shift the logic here to background pages so that popup can fetch and update blocklists at will.
+// TODO: use https://www.npmjs.com/package/trpc-chrome
 const initialize = async () => {
   const {
     status: getBlocklistPreferencesStatus,
@@ -161,7 +162,7 @@ const initialize = async () => {
     payload: getBlocklistsMapPayload,
   } = await adapter.execute('getBlocklistsMap', undefined)
   if (!getBlocklistsMapStatus) throw getBlocklistsMapStatus
-  const { payload: { value, wasNull: wasBlocklistsMapNull } } = getBlocklistsMapPayload
+  const { payload: { wasNull: wasBlocklistsMapNull } } = getBlocklistsMapPayload
   if (wasBlocklistsMapNull === 'yes') {
     const blocklistsMap = await fetchBlocklistsMapFromRemote()
     const { status: setBlocklistsMapStatus, payload: setBlocklistsMapPayload } = await adapter.execute('setBlocklistsMap', { blocklistsMap })

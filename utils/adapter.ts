@@ -22,7 +22,7 @@ export interface IAdapter {
   }
   getBlocklistHashes: {
     payload: { blocklistIDs: string[] }
-    result: Map<string, string | null>
+    result: Record<string, string | null>
   }
   setBlocklistHash: {
     payload: {

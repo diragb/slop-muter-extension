@@ -70,7 +70,7 @@ const getBlocklistHashes = async ({
   blocklistIDs,
 }: {
   blocklistIDs: string[]
-}): Promise<Returnable<Map<string, string | null>, Error>> => {
+}): Promise<Returnable<Record<string, string | null>, Error>> => {
   try {
     const blocklistHashes: Map<string, string | null> = new Map()
     for (const blocklistID of blocklistIDs) {
@@ -79,8 +79,9 @@ const getBlocklistHashes = async ({
       })
       blocklistHashes.set(blocklistID, !status ? '' : blocklistHash.value === null ? '' : JSON.parse(blocklistHash.value))
     }
-
-    return returnable.success(blocklistHashes)
+    
+    const blocklistHashesObject: Record<string, string | null> = Object.fromEntries(blocklistHashes.entries())
+    return returnable.success(blocklistHashesObject)
   } catch (error) {
     xonsole.error('getBlocklistHashes', error as Error, { blocklistIDs })
     return returnable.fail(error as Error)
@@ -195,6 +196,48 @@ const setBlocklistsMap = async ({
   }
 }
 
+const getUnifiedBlocklist = async (): (Promise<Returnable<Returnable<{
+  value: string[]
+  wasNull: 'yes' | 'no'
+}, {
+  value: string[]
+  wasNull: 'indeterminate'
+}>, Error>>) => {
+  try {
+    return returnable.success(await get<string[]>({
+      key: KEYS.unifiedBlocklist,
+      defaultValue: [],
+      onNull: () => set({
+        key: KEYS.unifiedBlocklist,
+        value: '',
+      }),
+      processor: blocklistUsernames => blocklistUsernames.slice(1, blocklistUsernames.length - 1).split(',')
+    }))
+  } catch (error) {
+    xonsole.warn('getUnifiedBlocklist', error as Error, { })
+    return returnable.fail(error as Error)
+  }
+}
+
+const setUnifiedBlocklist = async ({
+  blocklist,
+}: {
+  blocklist: string[]
+}): Promise<Returnable<undefined, Error>> => {
+  try {
+    const result = await set({
+      key: KEYS.unifiedBlocklist,
+      value: blocklist.join(','),
+    })
+
+    if (!result.status) throw result.payload
+    else return returnable.success(result.payload)
+  } catch (error) {
+    xonsole.warn('setUnifiedBlocklist', error as Error, { blocklist })
+    return returnable.fail(error as Error)
+  }
+}
+
 // Exports:
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -224,6 +267,12 @@ export default defineBackground(() => {
         return true
       case INTERNAL_MESSAGE_ACTIONS.setBlocklistsMap:
         setBlocklistsMap(request.payload).then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.getUnifiedBlocklist:
+        getUnifiedBlocklist().then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.setUnifiedBlocklist:
+        setUnifiedBlocklist(request.payload).then(sendResponse)
         return true
     }
   })

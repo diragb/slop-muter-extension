@@ -15,6 +15,7 @@ export const KEYS = {
   blocklist: (blocklistID: string) => blocklistID,
   blocklistHash: (blocklistID: string) => `${blocklistID}-hash`,
   blocklistsMap: 'blocklists-map',
+  unifiedBlocklist: 'unified-blocklist',
 } as const
 
 export const get = async <T = null>({

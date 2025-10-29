@@ -8,4 +8,6 @@ export const INTERNAL_MESSAGE_ACTIONS = {
   setBlocklist: 'setBlocklist',
   getBlocklistsMap: 'getBlocklistsMap',
   setBlocklistsMap: 'setBlocklistsMap',
+  getUnifiedBlocklist: 'getUnifiedBlocklist',
+  setUnifiedBlocklist: 'setUnifiedBlocklist',
 }

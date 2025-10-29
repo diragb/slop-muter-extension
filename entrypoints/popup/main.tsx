@@ -1,10 +1,13 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App.tsx';
-import './style.css';
+// Packages:
+import React from 'react'
+import ReactDOM from 'react-dom/client'
 
+// Components:
+import App from './App.tsx'
+
+// Functions:
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,
-);
+)
