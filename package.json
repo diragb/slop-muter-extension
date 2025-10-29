@@ -1,6 +1,6 @@
 {
-  "name": "slop-blocker",
-  "description": "Block slop on your X feed.",
+  "name": "slop-muter",
+  "description": "Browser extension that blocks slop posts on your X/Twitter feed for you.",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -11,12 +11,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/diragb/slop-blocker-extension.git"
+    "url": "git+https://github.com/diragb/slop-muter-extension.git"
   },
   "bugs": {
-    "url": "https://github.com/diragb/slop-blocker-extension/issues"
+    "url": "https://github.com/diragb/slop-muter-extension/issues"
   },
-  "homepage": "https://github.com/diragb/slop-blocker-extension#readme",
+  "homepage": "https://github.com/diragb/slop-muter-extension#readme",
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
@@ -28,13 +28,21 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.3",
+    "@tailwindcss/vite": "^4.1.16",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.548.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "tailwind-merge": "^3.3.1",
+    "tailwindcss": "^4.1.16"
   },
   "devDependencies": {
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@wxt-dev/module-react": "^1.1.3",
+    "tw-animate-css": "^1.4.0",
     "typescript": "^5.9.2",
     "wxt": "^0.20.6"
   },
@@ -47,7 +55,7 @@
   "keywords": [
     "slop",
     "x",
-    "blocker",
+    "block",
     "mute",
     "twitter"
   ],

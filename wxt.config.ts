@@ -1,13 +1,15 @@
-import { defineConfig } from 'wxt';
+import { defineConfig } from 'wxt'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'path'
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     permissions: ['storage', 'activeTab'],
-    name: 'Slop Blocker',
-    short_name: 'Slop Blocker',
-    description: 'Block slop on your X feed.',
+    name: 'Slop Muter',
+    short_name: 'Slop Muter',
+    description: 'Browser extension that blocks slop posts on your X/Twitter feed for you.',
     version: '0.1.0',
     author: {
       email: 'hey@diragb.dev'
@@ -19,6 +21,14 @@ export default defineConfig({
       extension_pages: "script-src 'self'; object-src 'self'",
       sandbox: "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self';"
     },
-    homepage_url: 'https://slop-blocker.diragb.dev',
+    homepage_url: 'https://slopmuter.diragb.dev',
   },
-});
+  vite: () => ({
+    plugins: [tailwindcss()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './'),
+      },
+    },
+  }),
+})
