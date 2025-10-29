@@ -27,10 +27,12 @@ type ScannedTweet = ScannedBasicTweet | ScannedRepostTweet | ScannedQuoteTweet
 
 // Constants:
 const adapter = new Adapter()
-const BASE_ENDPOINT = import.meta.env.WXT_ENVIRONMENT === 'local' ? 'http://localhost:8080/api' : '//slop-blocker.diragb.dev/api'
+// const BASE_ENDPOINT = import.meta.env.WXT_ENVIRONMENT === 'local' ? 'http://localhost:8080/api' : '//slop-blocker.diragb.dev/api'
+const BASE_ENDPOINT = 'https://raw.githubusercontent.com/diragb/slop-muter-webapp/refs/heads/main'
 const ENDPOINTS = {
-  blocklists: (blocklistID: string) => `${BASE_ENDPOINT}/blocklists/${blocklistID}`,
-  blocklistHashes: (blocklistID: string) => `${BASE_ENDPOINT}/blocklist-hashes/${blocklistID}`,
+  blocklists: (blocklistID: string) => `${BASE_ENDPOINT}/public/blocklists/${blocklistID}.txt`,
+  blocklistHashes: (blocklistID: string) => `${BASE_ENDPOINT}/public/blocklist-hashes/${blocklistID}.txt`,
+  blocklistsMap: `${BASE_ENDPOINT}/src/constants/blocklists-map.json`,
 }
 
 // Variables:
@@ -57,6 +59,17 @@ const fetchBlocklistFromRemote = async (blocklistID: string): Promise<string[]> 
   } catch (error) {
     xonsole.warn('fetchBlocklistFromRemote', error as Error, { blocklistID }, 'fetch the blocklist hash from remote by calling')
     return []
+  }
+}
+
+const fetchBlocklistsMapFromRemote = async (): Promise<Record<string, { name: string, description: string }>> => {
+  try {
+    const response = await fetch(ENDPOINTS.blocklistsMap)
+    const blocklistsMap = JSON.parse(await response.text()) as Record<string, { name: string, description: string }>
+    return blocklistsMap
+  } catch (error) {
+    xonsole.warn('fetchBlocklistsMapFromRemote', error as Error, {}, 'fetch the blocklists map from remote by calling')
+    return {}
   }
 }
 
@@ -134,11 +147,27 @@ const getUnifiedBlocklist = async (blocklistIDs: string[], isFreshInstall: boole
 }
 
 const initialize = async () => {
-  const { status, payload } = await adapter.execute('getBlocklistPreferences', undefined)
-  if (!status) throw payload
-  const { payload: { value: blocklistPreferences, wasNull: wasBlocklistPreferencesNull } } = payload
+  const {
+    status: getBlocklistPreferencesStatus,
+    payload: getBlocklistPreferencesPayload,
+  } = await adapter.execute('getBlocklistPreferences', undefined)
+  if (!getBlocklistPreferencesStatus) throw getBlocklistPreferencesPayload
+  const { payload: { value: blocklistPreferences, wasNull: wasBlocklistPreferencesNull } } = getBlocklistPreferencesPayload
   const isFreshInstall = wasBlocklistPreferencesNull === 'yes' || wasBlocklistPreferencesNull === 'indeterminate'
   const unifiedBlocklist = await getUnifiedBlocklist(blocklistPreferences, isFreshInstall)
+
+  const {
+    status: getBlocklistsMapStatus,
+    payload: getBlocklistsMapPayload,
+  } = await adapter.execute('getBlocklistsMap', undefined)
+  if (!getBlocklistsMapStatus) throw getBlocklistsMapStatus
+  const { payload: { value, wasNull: wasBlocklistsMapNull } } = getBlocklistsMapPayload
+  if (wasBlocklistsMapNull === 'yes') {
+    const blocklistsMap = await fetchBlocklistsMapFromRemote()
+    const { status: setBlocklistsMapStatus, payload: setBlocklistsMapPayload } = await adapter.execute('setBlocklistsMap', { blocklistsMap })
+    if (!setBlocklistsMapStatus) throw setBlocklistsMapPayload
+  }
+
   return unifiedBlocklist
 }
 
@@ -156,16 +185,16 @@ const scanTweets = (): Array<ScannedTweet> => {
       let parentTweet: HTMLElement | null = null
 
       if (isReposted) type = 'repost'
-      const isQuoteTweet = tweet.querySelectorAll('[data-testid="Tweet-User-Avatar"]').length > 1
+      const isQuoteTweet = tweet?.querySelectorAll('[data-testid="Tweet-User-Avatar"]').length > 1
 
       if (isQuoteTweet) {
-        parentUsername = tweet.querySelectorAll('[data-testid="User-Name"]')[0].children[1].getElementsByTagName('a')[0].innerText?.slice(1)
+        parentUsername = tweet?.querySelectorAll('[data-testid="User-Name"]')[0].children[1].getElementsByTagName('a')[0].innerText?.slice(1)
         parentTweet = tweet as HTMLElement
-        tweet = tweet.querySelectorAll('[tabindex="0"]')[0]
-        username = (tweet.querySelectorAll('[data-testid="User-Name"]')[0].querySelectorAll('[tabindex="-1"]')[0] as HTMLElement).innerText?.slice(1)
+        tweet = tweet?.querySelectorAll('[tabindex="0"]')[0]
+        username = (tweet?.querySelectorAll('[data-testid="User-Name"]')[0]?.querySelectorAll('[tabindex="-1"]')[0] as HTMLElement).innerText?.slice(1)
         type = 'quote-tweet'
       } else {
-        username = tweet.querySelectorAll('[data-testid="User-Name"]')[0].children[1].getElementsByTagName('a')[0].innerText?.slice(1)
+        username = tweet?.querySelectorAll('[data-testid="User-Name"]')[0].children[1].getElementsByTagName('a')[0].innerText?.slice(1)
       }
 
       if (type === 'quote-tweet') {

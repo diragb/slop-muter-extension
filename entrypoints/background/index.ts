@@ -157,6 +157,44 @@ const setBlocklist = async ({
   }
 }
 
+const getBlocklistsMap = async (): (Promise<Returnable<Returnable<{
+  value: Record<string, { name: string, description: string }>
+  wasNull: 'yes' | 'no'
+}, {
+  value: Record<string, { name: string, description: string }>
+  wasNull: 'indeterminate'
+}>, Error>>) => {
+  try {
+    return returnable.success(await get<Record<string, { name: string, description: string }>>({
+      key: KEYS.blocklistsMap,
+      defaultValue: {},
+      processor: json => JSON.parse(json),
+    }))
+  } catch (error) {
+    xonsole.warn('getBlocklistsMap', error as Error, {})
+    return returnable.fail(error as Error)
+  }
+}
+
+const setBlocklistsMap = async ({
+  blocklistsMap,
+}: {
+  blocklistsMap: Record<string, { name: string, description: string }>
+}): Promise<Returnable<undefined, Error>> => {
+  try {
+    const result = await set({
+      key: KEYS.blocklistsMap,
+      value: JSON.stringify(blocklistsMap),
+    })
+
+    if (!result.status) throw result.payload
+    else return returnable.success(result.payload)
+  } catch (error) {
+    xonsole.warn('setBlocklistsMap', error as Error, { blocklistsMap })
+    return returnable.fail(error as Error)
+  }
+}
+
 // Exports:
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -180,6 +218,12 @@ export default defineBackground(() => {
         return true
       case INTERNAL_MESSAGE_ACTIONS.setBlocklist:
         setBlocklist(request.payload).then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.getBlocklistsMap:
+        getBlocklistsMap().then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.setBlocklistsMap:
+        setBlocklistsMap(request.payload).then(sendResponse)
         return true
     }
   })

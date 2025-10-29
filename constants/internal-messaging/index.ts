@@ -6,4 +6,6 @@ export const INTERNAL_MESSAGE_ACTIONS = {
   setBlocklistHash: 'setBlocklistHash',
   getBlocklist: 'getBlocklist',
   setBlocklist: 'setBlocklist',
+  getBlocklistsMap: 'getBlocklistsMap',
+  setBlocklistsMap: 'setBlocklistsMap',
 }

@@ -48,6 +48,22 @@ export interface IAdapter {
     }
     result: undefined
   }
+  getBlocklistsMap: {
+    payload: undefined
+    result: Returnable<{
+      value: string
+      wasNull: 'yes' | 'no'
+    }, {
+      value: string
+      wasNull: 'indeterminate'
+    }>
+  }
+  setBlocklistsMap: {
+    payload: {
+      blocklistsMap: Record<string, { name: string, description: string }>
+    }
+    result: undefined
+  }
 }
 
 // Constants:
