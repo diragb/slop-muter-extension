@@ -1,6 +1,7 @@
 // Packages:
 import returnable from '@/utils/returnable'
 import xonsole from '@/utils/xonsole'
+import { storage } from '#imports'
 
 // Typescript:
 import type { Returnable } from '@/types/helpers'
@@ -13,6 +14,7 @@ export const KEYS = {
   blocklistPreferences: 'blocklist-preferences',
   blocklist: (blocklistID: string) => blocklistID,
   blocklistHash: (blocklistID: string) => `${blocklistID}-hash`,
+  blocklistsMap: 'blocklists-map',
 } as const
 
 export const get = async <T = null>({
@@ -34,7 +36,7 @@ export const get = async <T = null>({
 }>> => {
   try {
     key = SIGNATURE + key
-    const value = (await browser.storage.local.get(key))[key] ?? null
+    const value = (await storage.getItem<string>(`local:${key}`)) ?? null
     const result = value === null ? {
       value: (defaultValue ?? null as T),
       wasNull: 'yes' as const,
@@ -87,10 +89,10 @@ export const set = async <T>({
     }
 
     if (stringifiedValue !== null) {
-      await browser.storage.local.set({ key: stringifiedValue })
+      await storage.setItem(`local:${key}`, stringifiedValue)
       return returnable.success(undefined)
     } else if (stringifiedValue === null && override) {
-      await browser.storage.local.remove(key)
+      await storage.removeItem(`local:${key}`)
       return returnable.success(undefined)
     } else return returnable.fail(error === null ? new Error(`Encountered an error while attempting to stringify value to store to key "${key}" in LocalStorage`) : error)
   } catch (error) {
