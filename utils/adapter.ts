@@ -6,6 +6,17 @@ import xonsole from '@/utils/xonsole'
 import type { Returnable } from '@/types/helpers'
 
 export interface IAdapter {
+  fetchBlocklistsMapFromRemote: {
+    payload: undefined
+    result: Record<string, {
+      name: string
+      description: string
+    }>
+  }
+  generateAndUpdateUnifiedBlocklist: {
+    payload: undefined
+    result: string[]
+  }
   getBlocklistPreferences: {
     payload: undefined,
     result: Returnable<{
@@ -62,6 +73,26 @@ export interface IAdapter {
     payload: {
       blocklistsMap: Record<string, { name: string, description: string }>
     }
+    result: undefined
+  }
+  getUnifiedBlocklist: {
+    payload: undefined
+    result: Returnable<{
+      value: string[]
+      wasNull: 'yes' | 'no'
+    }, {
+      value: string[]
+      wasNull: 'indeterminate'
+    }>
+  }
+  setUnifiedBlocklist: {
+    payload: {
+      blocklist: string[]
+    }
+    result: undefined
+  }
+  refreshUnifiedBlocklist: {
+    payload: undefined
     result: undefined
   }
 }

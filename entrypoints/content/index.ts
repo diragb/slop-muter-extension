@@ -1,8 +1,11 @@
 // Packages:
 import Adapter from '@/utils/adapter'
 import xonsole from '@/utils/xonsole'
+import returnable from '@/utils/returnable'
 
 // Typescript:
+import type { Returnable } from '@/types/helpers'
+
 interface ScannedBasicTweet {
   username: string
   tweet: HTMLElement
@@ -26,150 +29,47 @@ interface ScannedQuoteTweet {
 type ScannedTweet = ScannedBasicTweet | ScannedRepostTweet | ScannedQuoteTweet
 
 // Constants:
+import { INTERNAL_MESSAGE_ACTIONS } from '@/constants/internal-messaging'
 const adapter = new Adapter()
-// const BASE_ENDPOINT = import.meta.env.WXT_ENVIRONMENT === 'local' ? 'http://localhost:8080/api' : '//slop-blocker.diragb.dev/api'
-const BASE_ENDPOINT = 'https://raw.githubusercontent.com/diragb/slop-muter-webapp/refs/heads/main'
-const ENDPOINTS = {
-  blocklists: (blocklistID: string) => `${BASE_ENDPOINT}/public/blocklists/${blocklistID}.txt`,
-  blocklistHashes: (blocklistID: string) => `${BASE_ENDPOINT}/public/blocklist-hashes/${blocklistID}.txt`,
-  blocklistsMap: `${BASE_ENDPOINT}/src/constants/blocklists-map.json`,
-}
 
 // Variables:
 let _unifiedBlocklist = new Set<string>()
 
 // Functions:
-const fetchBlocklistHashFromRemote = async (blocklistID: string): Promise<string | null> => {
+
+
+const initialize = async (): Promise<Returnable<Set<string>, Error>> => {
   try {
-    const response = await fetch(ENDPOINTS.blocklistHashes(blocklistID))
-    const blocklistHash = await response.text()
-    return blocklistHash
-  } catch (error) {
-    xonsole.warn('fetchBlocklistHashFromRemote', error as Error, { blocklistID }, 'fetch the blocklist hash from remote by calling')
-    return null
-  }
-}
+    const {
+      status: generateAndUpdateUnifiedBlocklistStatus,
+      payload: generateAndUpdateUnifiedBlocklistPayload,
+    } = await adapter.execute('generateAndUpdateUnifiedBlocklist', undefined)
+    if (!generateAndUpdateUnifiedBlocklistStatus) throw generateAndUpdateUnifiedBlocklistPayload
 
-const fetchBlocklistFromRemote = async (blocklistID: string): Promise<string[]> => {
-  try {
-    const response = await fetch(ENDPOINTS.blocklists(blocklistID))
-    const blocklist = (await response.text()).split(',').filter(blocklistUsername => blocklistUsername.length > 0)
-    return blocklist
-  } catch (error) {
-    xonsole.warn('fetchBlocklistFromRemote', error as Error, { blocklistID }, 'fetch the blocklist hash from remote by calling')
-    return []
-  }
-}
-
-const fetchBlocklistsMapFromRemote = async (): Promise<Record<string, { name: string, description: string }>> => {
-  try {
-    const response = await fetch(ENDPOINTS.blocklistsMap)
-    const blocklistsMap = JSON.parse(await response.text()) as Record<string, { name: string, description: string }>
-    return blocklistsMap
-  } catch (error) {
-    xonsole.warn('fetchBlocklistsMapFromRemote', error as Error, {}, 'fetch the blocklists map from remote by calling')
-    return {}
-  }
-}
-
-const getOutOfSyncBlocklists = async (blocklistIDs: string[]): Promise<string[]> => {
-  const { status, payload } = await adapter.execute('getBlocklistHashes', { blocklistIDs })
-  if (!status) throw payload
-  const blocklistHashes = new Map<string, string | null>(Object.entries(payload))
-
-  const fetchedBlocklistHashes = new Map<string, string | null>()
-  const blocklistsOutOfSyncWithRemote: string[] = []
-
-  const blocklistHashPromises = new Map<string, Promise<string | null>>()
-  for (const blocklistID of blocklistIDs) {
-    blocklistHashPromises.set(
-      blocklistID,
-      fetchBlocklistHashFromRemote(blocklistID)
-    )
-  }
-
-  const resolvedBlocklistHashes = await Promise.all(blocklistHashPromises.values())
-  for (let i = 0; i < resolvedBlocklistHashes.length; i++) {
-    fetchedBlocklistHashes.set(blocklistIDs[i], resolvedBlocklistHashes[i])
-  }
-
-  for (const blocklistID of blocklistIDs) {
-    if (
-      blocklistHashes.get(blocklistID) === null ||
-      fetchedBlocklistHashes.get(blocklistID) === null ||
-      blocklistHashes.get(blocklistID) !== fetchedBlocklistHashes.get(blocklistID)
-    ) {
-      blocklistsOutOfSyncWithRemote.push(blocklistID)
+    const {
+      status: getBlocklistsMapStatus,
+      payload: getBlocklistsMapPayload,
+    } = await adapter.execute('getBlocklistsMap', undefined)
+    if (!getBlocklistsMapStatus) throw getBlocklistsMapStatus
+    const { payload: { wasNull: wasBlocklistsMapNull } } = getBlocklistsMapPayload
+    if (wasBlocklistsMapNull === 'yes') {
+      const {
+        status: fetchBlocklistsMapFromRemoteStatus,
+        payload: fetchBlocklistsMapFromRemotePayload,
+      } = await adapter.execute('fetchBlocklistsMapFromRemote', undefined)
+      if (!fetchBlocklistsMapFromRemoteStatus) throw fetchBlocklistsMapFromRemotePayload
+      const {
+        status: setBlocklistsMapStatus,
+        payload: setBlocklistsMapPayload,
+      } = await adapter.execute('setBlocklistsMap', { blocklistsMap: fetchBlocklistsMapFromRemotePayload })
+      if (!setBlocklistsMapStatus) throw setBlocklistsMapPayload
     }
+
+    return returnable.success(new Set(generateAndUpdateUnifiedBlocklistPayload))
+  } catch (error) {
+    xonsole.error('initialize', error as Error, {})
+    return returnable.fail(error as Error)
   }
-
-  return blocklistsOutOfSyncWithRemote
-}
-
-const getUnifiedBlocklist = async (blocklistIDs: string[], isFreshInstall: boolean) => {
-  const blocklistsToFetch = isFreshInstall ? blocklistIDs : await getOutOfSyncBlocklists(blocklistIDs)
-  const cachedBlocklistIDs: string[] = isFreshInstall ? [] : blocklistIDs.filter(blocklistID => !blocklistsToFetch.includes(blocklistID))
-  const fetchedBlocklists = new Map<string, string[]>()
-  const cachedBlocklists = new Map<string, string[]>()
-
-  const blocklistPromises = new Map<string, Promise<string[]>>()
-  for (const blocklistID of blocklistsToFetch) {
-    blocklistPromises.set(
-      blocklistID,
-      fetchBlocklistFromRemote(blocklistID)
-    )
-  }
-
-  const resolvedBlocklists = await Promise.all(blocklistPromises.values())
-  for (let i = 0; i < resolvedBlocklists.length; i++) {
-    const blocklistID = blocklistsToFetch[i]
-    fetchedBlocklists.set(blocklistID, resolvedBlocklists[i])
-    const blocklist = resolvedBlocklists[i].flat().sort((a, b) => String(a).localeCompare(String(b)))
-    const { status: setBlocklistStatus, payload: setBlocklistPayload } = await adapter.execute('setBlocklist', { blocklistID, blocklist })
-    if (!setBlocklistStatus) throw setBlocklistPayload
-    const { status: setBlocklistHashStatus, payload: setBlocklistHashPayload } = await adapter.execute('setBlocklistHash', { blocklistID, blocklist })
-    if (!setBlocklistHashStatus) throw setBlocklistHashPayload
-  }
-  const flatResolvedBlocklists = resolvedBlocklists.flat()
-
-  const flatCachedBlocklists: string[] = []
-  for (const blocklistID of cachedBlocklistIDs) {
-    const { status, payload } = await adapter.execute('getBlocklist', { blocklistID })
-    if (!status) throw payload
-    const { payload: { value: blocklist } } = payload
-    cachedBlocklists.set(blocklistID, blocklist)
-    flatCachedBlocklists.push(...blocklist)
-  }
-
-  const unifiedBlocklists = [...flatResolvedBlocklists, ...flatCachedBlocklists]
-  return new Set(unifiedBlocklists.sort((blocklistUsernameA, blocklistUsernameB) => String(blocklistUsernameA).localeCompare(String(blocklistUsernameB))))
-}
-
-// Shift the logic here to background pages so that popup can fetch and update blocklists at will.
-// TODO: use https://www.npmjs.com/package/trpc-chrome
-const initialize = async () => {
-  const {
-    status: getBlocklistPreferencesStatus,
-    payload: getBlocklistPreferencesPayload,
-  } = await adapter.execute('getBlocklistPreferences', undefined)
-  if (!getBlocklistPreferencesStatus) throw getBlocklistPreferencesPayload
-  const { payload: { value: blocklistPreferences, wasNull: wasBlocklistPreferencesNull } } = getBlocklistPreferencesPayload
-  const isFreshInstall = wasBlocklistPreferencesNull === 'yes' || wasBlocklistPreferencesNull === 'indeterminate'
-  const unifiedBlocklist = await getUnifiedBlocklist(blocklistPreferences, isFreshInstall)
-
-  const {
-    status: getBlocklistsMapStatus,
-    payload: getBlocklistsMapPayload,
-  } = await adapter.execute('getBlocklistsMap', undefined)
-  if (!getBlocklistsMapStatus) throw getBlocklistsMapStatus
-  const { payload: { wasNull: wasBlocklistsMapNull } } = getBlocklistsMapPayload
-  if (wasBlocklistsMapNull === 'yes') {
-    const blocklistsMap = await fetchBlocklistsMapFromRemote()
-    const { status: setBlocklistsMapStatus, payload: setBlocklistsMapPayload } = await adapter.execute('setBlocklistsMap', { blocklistsMap })
-    if (!setBlocklistsMapStatus) throw setBlocklistsMapPayload
-  }
-
-  return unifiedBlocklist
 }
 
 const scanTweets = (): Array<ScannedTweet> => {
@@ -264,13 +164,27 @@ const muteSlop = () => {
   }
 }
 
+const refreshUnifiedBlocklist = async () => {
+  try {
+    const {
+      status: generateAndUpdateUnifiedBlocklistStatus,
+      payload: generateAndUpdateUnifiedBlocklistPayload,
+    } = await adapter.execute('generateAndUpdateUnifiedBlocklist', undefined)
+    if (!generateAndUpdateUnifiedBlocklistStatus) throw generateAndUpdateUnifiedBlocklistPayload
+
+    _unifiedBlocklist = new Set(generateAndUpdateUnifiedBlocklistPayload)
+  } catch (error) {
+    xonsole.error('refreshUnifiedBlocklist', error as Error, {})
+  }
+}
+
 // Exports:
 export default defineContentScript({
   matches: ['*://*.x.com/*'],
   main() {
-    initialize().then(unifiedBlocklist => {
-      console.log(unifiedBlocklist)
-      _unifiedBlocklist = unifiedBlocklist
+    initialize().then(({ status: initializeStatus, payload: initializePayload }) => {
+      if (!initializeStatus) throw initializePayload
+      _unifiedBlocklist = initializePayload
 
       let previousURL = window.location.href
       const URLObserver = new MutationObserver(() => {
@@ -292,6 +206,14 @@ export default defineContentScript({
       
       URLObserver.observe(document, { subtree: true, childList: true })
       window.addEventListener('scroll', muteSlop)
+
+      browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        switch (request.type) {
+          case INTERNAL_MESSAGE_ACTIONS.refreshUnifiedBlocklist:
+            refreshUnifiedBlocklist().then(sendResponse)
+            return true
+        }
+      })
     })
   },
 })

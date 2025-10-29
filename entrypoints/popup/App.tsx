@@ -7,6 +7,9 @@ import xonsole from '@/utils/xonsole'
 import Icon from '../../assets/icon.png'
 import { XIcon } from 'lucide-react'
 
+// Constants:
+import { INTERNAL_MESSAGE_ACTIONS } from '@/constants/internal-messaging'
+
 // Components:
 import { Badge } from '@/components/ui/badge'
 import BlocklistCombobox from './BlocklistCombobox'
@@ -21,7 +24,7 @@ const BlocklistBadge = ({
   description: string
   deleteBlocklistPreference: () => void
 }) => (
-  <Badge variant='outline' title={description} className='text-xs cursor-pointer transition-all hover:bg-rose-200' onClick={deleteBlocklistPreference}>
+  <Badge variant='outline' title={description} className='text-xs bg-white cursor-pointer transition-all hover:bg-rose-300' onClick={deleteBlocklistPreference}>
     {name}
     <XIcon />
   </Badge>
@@ -87,6 +90,11 @@ const App = () => {
         payload: setBlocklistPreferencesPayload,
       } = await adapter.current.execute('setBlocklistPreferences', { blocklistIDs: newBlocklistPreferences })
       if (!setBlocklistPreferencesStatus) throw setBlocklistPreferencesPayload
+
+      const [ tab ] = await browser.tabs.query({ active: true, currentWindow: true })
+      if (!tab?.id) throw new Error('No active tab found')
+
+      await browser.tabs.sendMessage(tab.id, { type: INTERNAL_MESSAGE_ACTIONS.refreshUnifiedBlocklist })
     } catch (error) {
       setBlocklistPreferences(_blocklistPreferences)
       xonsole.warn('deleteBlocklistPreference', error as Error, {})
@@ -105,6 +113,11 @@ const App = () => {
         payload: setBlocklistPreferencesPayload,
       } = await adapter.current.execute('setBlocklistPreferences', { blocklistIDs: newBlocklistPreferences })
       if (!setBlocklistPreferencesStatus) throw setBlocklistPreferencesPayload
+
+      const [ tab ] = await browser.tabs.query({ active: true, currentWindow: true })
+      if (!tab?.id) throw new Error('No active tab found')
+
+      await browser.tabs.sendMessage(tab.id, { type: INTERNAL_MESSAGE_ACTIONS.refreshUnifiedBlocklist })
     } catch (error) {
       setBlocklistPreferences(_blocklistPreferences)
       xonsole.warn('addBlocklistPreference', error as Error, {})

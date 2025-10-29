@@ -17,7 +17,171 @@ const DEFAULT_BLOCKLIST_PREFERENCES: string[] = [
   'low-effort',
 ]
 
+// const BASE_ENDPOINT = import.meta.env.WXT_ENVIRONMENT === 'local' ? 'http://localhost:8080/api' : '//slop-blocker.diragb.dev/api'
+const BASE_ENDPOINT = 'https://raw.githubusercontent.com/diragb/slop-muter-webapp/refs/heads/main'
+const ENDPOINTS = {
+  blocklists: (blocklistID: string) => `${BASE_ENDPOINT}/public/blocklists/${blocklistID}.txt`,
+  blocklistHashes: (blocklistID: string) => `${BASE_ENDPOINT}/public/blocklist-hashes/${blocklistID}.txt`,
+  blocklistsMap: `${BASE_ENDPOINT}/src/constants/blocklists-map.json`,
+}
+
 // Functions:
+const fetchBlocklistHashFromRemote = async (blocklistID: string): Promise<string | null> => {
+  try {
+    const response = await fetch(ENDPOINTS.blocklistHashes(blocklistID))
+    if (response.status !== 200) {
+      xonsole.warn('fetchBlocklistHashFromRemote', new Error(`fetchBlocklistHashFromRemote returned with status ${response.status}`), { blocklistID })
+      return null
+    }
+    const blocklistHash = await response.text()
+    return blocklistHash
+  } catch (error) {
+    xonsole.warn('fetchBlocklistHashFromRemote', error as Error, { blocklistID }, 'fetch the blocklist hash from remote by calling')
+    return null
+  }
+}
+
+const fetchBlocklistFromRemote = async (blocklistID: string): Promise<string[]> => {
+  try {
+    const response = await fetch(ENDPOINTS.blocklists(blocklistID))
+    if (response.status !== 200) {
+      xonsole.warn('fetchBlocklistFromRemote', new Error(`fetchBlocklistFromRemote returned with status ${response.status}`), { blocklistID })
+      return []
+    }
+    const blocklist = (await response.text()).split(',').filter(blocklistUsername => blocklistUsername.length > 0)
+    return blocklist
+  } catch (error) {
+    xonsole.warn('fetchBlocklistFromRemote', error as Error, { blocklistID }, 'fetch the blocklist hash from remote by calling')
+    return []
+  }
+}
+
+const fetchBlocklistsMapFromRemote = async (): Promise<Returnable<Record<string, { name: string, description: string }>, Error>> => {
+  try {
+    const response = await fetch(ENDPOINTS.blocklistsMap)
+    if (response.status !== 200) {
+      throw new Error(`fetchBlocklistsMapFromRemote returned with status ${response.status}`)
+    }
+    const blocklistsMap = JSON.parse(await response.text()) as Record<string, { name: string, description: string }>
+    return returnable.success(blocklistsMap)
+  } catch (error) {
+    xonsole.warn('fetchBlocklistsMapFromRemote', error as Error, {}, 'fetch the blocklists map from remote by calling')
+    return returnable.fail(error as Error)
+  }
+}
+
+const getOutOfSyncBlocklists = async (blocklistIDs: string[]): Promise<Returnable<string[], Error>> => {
+  try {
+    const { status, payload } = await getBlocklistHashes({ blocklistIDs })
+    if (!status) throw payload
+    const blocklistHashes = new Map<string, string | null>(Object.entries(payload))
+
+    const fetchedBlocklistHashes = new Map<string, string | null>()
+    const blocklistsOutOfSyncWithRemote: string[] = []
+
+    const blocklistHashPromises = new Map<string, Promise<string | null>>()
+    for (const blocklistID of blocklistIDs) {
+      blocklistHashPromises.set(
+        blocklistID,
+        fetchBlocklistHashFromRemote(blocklistID)
+      )
+    }
+
+    const resolvedBlocklistHashes = await Promise.all(blocklistHashPromises.values())
+    for (let i = 0; i < resolvedBlocklistHashes.length; i++) {
+      fetchedBlocklistHashes.set(blocklistIDs[i], resolvedBlocklistHashes[i])
+    }
+
+    for (const blocklistID of blocklistIDs) {
+      if (
+        blocklistHashes.get(blocklistID) === null ||
+        fetchedBlocklistHashes.get(blocklistID) === null ||
+        blocklistHashes.get(blocklistID) !== fetchedBlocklistHashes.get(blocklistID)
+      ) {
+        blocklistsOutOfSyncWithRemote.push(blocklistID)
+      }
+    }
+
+    return returnable.success(blocklistsOutOfSyncWithRemote)
+  } catch (error) {
+    xonsole.warn('getOutOfSyncBlocklists', error as Error, { blocklistIDs })
+    return returnable.fail(error as Error)
+  }
+}
+
+const generateAndUpdateUnifiedBlocklist = async (): Promise<Returnable<string[], Error>> => {
+  try {
+    const {
+      status: getBlocklistPreferencesStatus,
+      payload: getBlocklistPreferencesPayload,
+    } = await getBlocklistPreferences()
+    if (!getBlocklistPreferencesStatus) throw getBlocklistPreferencesPayload
+    const { payload: { value: blocklistIDs, wasNull: wasBlocklistPreferencesNull } } = getBlocklistPreferencesPayload
+    const isFreshInstall = wasBlocklistPreferencesNull === 'yes' || wasBlocklistPreferencesNull === 'indeterminate'
+
+    let blocklistsToFetch: string[] = []
+    
+    if (!isFreshInstall) {
+      const {
+        status: getOutOfSyncBlocklistsStatus,
+        payload: getOutOfSyncBlocklistsPayload,
+      } = await getOutOfSyncBlocklists(blocklistIDs)
+      if (!getOutOfSyncBlocklistsStatus) throw getOutOfSyncBlocklistsPayload
+
+      blocklistsToFetch = getOutOfSyncBlocklistsPayload
+    } else {
+      blocklistsToFetch = blocklistIDs
+    }
+    const cachedBlocklistIDs: string[] = isFreshInstall ? [] : blocklistIDs.filter(blocklistID => !blocklistsToFetch.includes(blocklistID))
+    const fetchedBlocklists = new Map<string, string[]>()
+    const cachedBlocklists = new Map<string, string[]>()
+
+    const blocklistPromises = new Map<string, Promise<string[]>>()
+    for (const blocklistID of blocklistsToFetch) {
+      blocklistPromises.set(
+        blocklistID,
+        fetchBlocklistFromRemote(blocklistID)
+      )
+    }
+
+    const resolvedBlocklists = await Promise.all(blocklistPromises.values())
+    for (let i = 0; i < resolvedBlocklists.length; i++) {
+      const blocklistID = blocklistsToFetch[i]
+      fetchedBlocklists.set(blocklistID, resolvedBlocklists[i])
+      const blocklist = resolvedBlocklists[i].flat().sort((a, b) => String(a).localeCompare(String(b)))
+      const { status: setBlocklistStatus, payload: setBlocklistPayload } = await setBlocklist({ blocklistID, blocklist })
+      if (!setBlocklistStatus) throw setBlocklistPayload
+      const { status: setBlocklistHashStatus, payload: setBlocklistHashPayload } = await setBlocklistHash({ blocklistID, blocklist })
+      if (!setBlocklistHashStatus) throw setBlocklistHashPayload
+    }
+    const flatResolvedBlocklists = resolvedBlocklists.flat()
+
+    const flatCachedBlocklists: string[] = []
+    for (const blocklistID of cachedBlocklistIDs) {
+      const { status, payload } = await getBlocklist({ blocklistID })
+      if (!status) throw payload
+      const { payload: { value: blocklist } } = payload
+      cachedBlocklists.set(blocklistID, blocklist)
+      flatCachedBlocklists.push(...blocklist)
+    }
+
+    const unifiedBlocklists = [...flatResolvedBlocklists, ...flatCachedBlocklists]
+    const nonDuplicatedUnifiedBlocklists = [...(new Set(unifiedBlocklists.sort((blocklistUsernameA, blocklistUsernameB) => String(blocklistUsernameA).localeCompare(String(blocklistUsernameB)))))]
+
+    const {
+      status: setUnifiedBlocklistStatus,
+      payload: setUnifiedBlocklistPayload,
+    } = await setUnifiedBlocklist({ blocklist: nonDuplicatedUnifiedBlocklists })
+    if (!setUnifiedBlocklistStatus) throw setUnifiedBlocklistPayload
+
+    return returnable.success(nonDuplicatedUnifiedBlocklists)
+  } catch (error) {
+    xonsole.warn('generateAndUpdateUnifiedBlocklist', error as Error, {})
+    return returnable.fail(error as Error)
+  }
+}
+
+// Getters And Setters:
 const getBlocklistPreferences = async (): Promise<Returnable<Returnable<{
   value: string[]
   wasNull: 'yes' | 'no'
@@ -244,6 +408,12 @@ export default defineBackground(() => {
     // const tabID = sender?.tab?.id
 
     switch (request.type) {
+      case INTERNAL_MESSAGE_ACTIONS.fetchBlocklistsMapFromRemote:
+        fetchBlocklistsMapFromRemote().then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.generateAndUpdateUnifiedBlocklist:
+        generateAndUpdateUnifiedBlocklist().then(sendResponse)
+        return true
       case INTERNAL_MESSAGE_ACTIONS.getBlocklistPreferences:
         getBlocklistPreferences().then(sendResponse)
         return true
