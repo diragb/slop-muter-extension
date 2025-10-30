@@ -95,6 +95,46 @@ export interface IAdapter {
     payload: undefined
     result: undefined
   }
+  getScannedTweetCount: {
+    payload: undefined
+    result: Returnable<{
+      value: number
+      wasNull: 'yes' | 'no'
+    }, {
+      value: number
+      wasNull: 'indeterminate'
+    }>
+  }
+  incrementScannedTweetCount: {
+    payload: {
+      by: number
+    }
+    result: undefined
+  }
+  refreshScannedTweetCount: {
+    payload: undefined
+    result: undefined
+  }
+  getRemovedTweetCount: {
+    payload: undefined
+    result: Returnable<{
+      value: number
+      wasNull: 'yes' | 'no'
+    }, {
+      value: number
+      wasNull: 'indeterminate'
+    }>
+  }
+  incrementRemovedTweetCount: {
+    payload: {
+      by: number
+    }
+    result: undefined
+  }
+  refreshRemovedTweetCount: {
+    payload: undefined
+    result: undefined
+  }
 }
 
 // Constants:

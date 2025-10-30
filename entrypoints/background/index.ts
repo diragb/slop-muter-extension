@@ -402,8 +402,116 @@ const setUnifiedBlocklist = async ({
   }
 }
 
+const getScannedTweetCount = async (): (Promise<Returnable<Returnable<{
+  value: number
+  wasNull: 'yes' | 'no'
+}, {
+  value: number
+  wasNull: 'indeterminate'
+}>, Error>>) => {
+  try {
+    return returnable.success(await get<number>({
+      key: KEYS.scannedTweetCount,
+      defaultValue: 0,
+      onNull: () => set({
+        key: KEYS.scannedTweetCount,
+        value: '',
+      }),
+      processor: scanCount => {
+        const parsed = parseInt(scanCount)
+        return isNaN(parsed) ? 0 : parsed
+      }
+    }))
+  } catch (error) {
+    xonsole.warn('getScannedTweetCount', error as Error, { })
+    return returnable.fail(error as Error)
+  }
+}
+
+const incrementScannedTweetCount = async ({
+  by,
+}: {
+  by: number
+}): Promise<Returnable<undefined, Error>> => {
+  try {
+    const {
+      status: getScannedTweetCountStatus,
+      payload: getScannedTweetCountPayload,
+    } = await getScannedTweetCount()
+    if (!getScannedTweetCountStatus) throw getScannedTweetCountPayload
+    const { status, payload } = getScannedTweetCountPayload
+    if (!status) throw payload
+    
+    const result = await set({
+      key: KEYS.scannedTweetCount,
+      value: payload.value + by,
+    })
+
+    if (!result.status) throw result.payload
+    else return returnable.success(result.payload)
+  } catch (error) {
+    xonsole.warn('incrementScannedTweetCount', error as Error, { by })
+    return returnable.fail(error as Error)
+  }
+}
+
+const getRemovedTweetCount = async (): (Promise<Returnable<Returnable<{
+  value: number
+  wasNull: 'yes' | 'no'
+}, {
+  value: number
+  wasNull: 'indeterminate'
+}>, Error>>) => {
+  try {
+    return returnable.success(await get<number>({
+      key: KEYS.removedTweetCount,
+      defaultValue: 0,
+      onNull: () => set({
+        key: KEYS.removedTweetCount,
+        value: '',
+      }),
+      processor: scanCount => {
+        const parsed = parseInt(scanCount)
+        return isNaN(parsed) ? 0 : parsed
+      }
+    }))
+  } catch (error) {
+    xonsole.warn('getRemovedTweetCount', error as Error, { })
+    return returnable.fail(error as Error)
+  }
+}
+
+const incrementRemovedTweetCount = async ({
+  by,
+}: {
+  by: number
+}): Promise<Returnable<undefined, Error>> => {
+  try {
+    const {
+      status: getRemovedTweetCountStatus,
+      payload: getRemovedTweetCountPayload,
+    } = await getRemovedTweetCount()
+    if (!getRemovedTweetCountStatus) throw getRemovedTweetCountPayload
+    const { status, payload } = getRemovedTweetCountPayload
+    if (!status) throw payload
+    
+    const result = await set({
+      key: KEYS.removedTweetCount,
+      value: payload.value + by,
+    })
+
+    if (!result.status) throw result.payload
+    else return returnable.success(result.payload)
+  } catch (error) {
+    xonsole.warn('incrementRemovedTweetCount', error as Error, { by })
+    return returnable.fail(error as Error)
+  }
+}
+
 // Exports:
 export default defineBackground(() => {
+  let popupPort: globalThis.Browser.runtime.Port, contentScriptPort: globalThis.Browser.runtime.Port
+
   browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // const tabID = sender?.tab?.id
 
@@ -444,6 +552,31 @@ export default defineBackground(() => {
       case INTERNAL_MESSAGE_ACTIONS.setUnifiedBlocklist:
         setUnifiedBlocklist(request.payload).then(sendResponse)
         return true
+      case INTERNAL_MESSAGE_ACTIONS.getScannedTweetCount:
+        getScannedTweetCount().then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.incrementScannedTweetCount:
+        incrementScannedTweetCount(request.payload).then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.getRemovedTweetCount:
+        getRemovedTweetCount().then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.incrementRemovedTweetCount:
+        incrementRemovedTweetCount(request.payload).then(sendResponse)
+        return true
     }
   })
+
+  browser.runtime.onConnect.addListener(port => {
+    if (port.name === 'popup') popupPort = port
+    if (port.name === 'content-script') contentScriptPort = port
+  
+    port.onMessage.addListener(request => {
+      if (port === contentScriptPort && popupPort) {
+        console.log('background:', request)
+        popupPort.postMessage(request)
+      }
+    })
+  })
+  
 })

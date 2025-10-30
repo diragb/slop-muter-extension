@@ -13,4 +13,10 @@ export const INTERNAL_MESSAGE_ACTIONS = {
   getUnifiedBlocklist: 'getUnifiedBlocklist',
   setUnifiedBlocklist: 'setUnifiedBlocklist',
   refreshUnifiedBlocklist: 'refreshUnifiedBlocklist',
+  getScannedTweetCount: 'getScannedTweetCount',
+  incrementScannedTweetCount: 'incrementScannedTweetCount',
+  refreshScannedTweetCount: 'refreshScannedTweetCount',
+  getRemovedTweetCount: 'getRemovedTweetCount',
+  incrementRemovedTweetCount: 'incrementRemovedTweetCount',
+  refreshRemovedTweetCount: 'refreshRemovedTweetCount',
 } as const

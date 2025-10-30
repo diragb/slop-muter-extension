@@ -16,6 +16,8 @@ export const KEYS = {
   blocklistHash: (blocklistID: string) => `${blocklistID}-hash`,
   blocklistsMap: 'blocklists-map',
   unifiedBlocklist: 'unified-blocklist',
+  scannedTweetCount: 'scanned-tweet-count',
+  removedTweetCount: 'removed-tweet-count',
 } as const
 
 export const get = async <T = null>({

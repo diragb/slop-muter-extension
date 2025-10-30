@@ -38,6 +38,8 @@ const App = () => {
   const [blocklistPreferences, setBlocklistPreferences] = useState<string[]>([])
   const [blocklists, setBlocklists] = useState<Record<string, { name: string, description: string }>>({})
   const [blocklistsArray, setBlocklistsArray] = useState<Array<{ id: string, name: string, description: string }>>([])
+  const [scannedTweetCount, setScannedTweetCount] = useState(0)
+  const [removedTweetCount, setRemovedTweetCount] = useState(0)
 
   // Functions:
   const loadBlocklistPreferences = async () => {
@@ -46,7 +48,7 @@ const App = () => {
         status: getBlocklistPreferencesStatus,
         payload: getBlocklistPreferencesPayload,
       } = await adapter.current.execute('getBlocklistPreferences', undefined)
-      if (!getBlocklistPreferencesStatus) throw getBlocklistPreferencesStatus
+      if (!getBlocklistPreferencesStatus) throw getBlocklistPreferencesPayload
       const { payload: { value } } = getBlocklistPreferencesPayload
       if (value) {
         setBlocklistPreferences(value)
@@ -62,7 +64,7 @@ const App = () => {
         status: getBlocklistsMapStatus,
         payload: getBlocklistsMapPayload,
       } = await adapter.current.execute('getBlocklistsMap', undefined)
-      if (!getBlocklistsMapStatus) throw getBlocklistsMapStatus
+      if (!getBlocklistsMapStatus) throw getBlocklistsMapPayload
       const { payload: { value } } = getBlocklistsMapPayload
       if (value) {
         const blocklistsMap = JSON.parse(value) as Record<string, { name: string, description: string }>
@@ -124,10 +126,65 @@ const App = () => {
     }
   }
 
+  const refreshScannedTweetCount = async () => {
+    try {
+      const {
+        status: getScannedTweetCountStatus,
+        payload: getScannedTweetCountPayload,
+      } = await adapter.current.execute('getScannedTweetCount', undefined)
+      if (!getScannedTweetCountStatus) throw getScannedTweetCountPayload
+      const { payload: { value } } = getScannedTweetCountPayload
+      console.log('scannedTweetCount', value)
+      setScannedTweetCount(value)
+    } catch (error) {
+      xonsole.warn('refreshScannedTweetCount', error as Error, {})
+    }
+  }
+
+  const refreshRemovedTweetCount = async () => {
+    try {
+      const {
+        status: getRemovedTweetCountStatus,
+        payload: getRemovedTweetCountPayload,
+      } = await adapter.current.execute('getRemovedTweetCount', undefined)
+      if (!getRemovedTweetCountStatus) throw getRemovedTweetCountPayload
+      const { payload: { value } } = getRemovedTweetCountPayload
+      console.log('removedTweetCount', value)
+      setRemovedTweetCount(value)
+    } catch (error) {
+      xonsole.warn('refreshRemovedTweetCount', error as Error, {})
+    }
+  }
+
   // Effects:
   useEffect(() => {
     loadBlocklistPreferences()
     loadBlocklistsMap()
+    refreshScannedTweetCount()
+    refreshRemovedTweetCount()
+
+    const messageListener = (
+      request: any,
+      _port: Browser.runtime.Port,
+    ) => {
+      switch (request.type) {
+        case INTERNAL_MESSAGE_ACTIONS.refreshScannedTweetCount:
+          console.log('popup:refreshScannedTweetCount')
+          refreshScannedTweetCount()
+          break
+        case INTERNAL_MESSAGE_ACTIONS.refreshRemovedTweetCount:
+          console.log('popup:refreshRemovedTweetCount')
+          refreshRemovedTweetCount()
+          break
+      }
+    }
+
+    const port = browser.runtime.connect({ name: 'popup' })
+    port.onMessage.addListener(messageListener)
+
+    return () => {
+      port.onMessage.removeListener(messageListener)
+    }
   }, [])
 
   // Return:
@@ -157,6 +214,18 @@ const App = () => {
           addBlocklistID={addBlocklistPreference}
           deleteBlocklistID={deleteBlocklistPreference}
         />
+      </div>
+      <div className='flex flex-col gap-2'>
+        <h3 className='text-sm font-medium'>
+          <span className='font-semibold'>
+            {scannedTweetCount}
+          </span>{' '}tweets scanned
+        </h3>
+        <h3 className='text-sm font-medium'>
+          <span className='font-semibold'>
+            {removedTweetCount}
+          </span>{' '}tweets removed
+        </h3>
       </div>
     </main>
   )

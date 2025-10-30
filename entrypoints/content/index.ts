@@ -31,6 +31,7 @@ type ScannedTweet = ScannedBasicTweet | ScannedRepostTweet | ScannedQuoteTweet
 // Constants:
 import { INTERNAL_MESSAGE_ACTIONS } from '@/constants/internal-messaging'
 const adapter = new Adapter()
+const port = browser.runtime.connect({ name: 'content-script' })
 
 // Variables:
 let _unifiedBlocklist = new Set<string>()
@@ -154,44 +155,58 @@ const scanTweets = (): Array<ScannedTweet> => {
   return result
 }
 
-const muteSlop = () => {
-  const scannedTweets = scanTweets()
-  if (scannedTweets.length > 0) {
-    for (const scannedTweet of scannedTweets) {
-      if (
-        (
-          scannedTweet.type === 'quote-tweet' && (
-            _unifiedBlocklist.has(scannedTweet.username) ||
-            _unifiedBlocklist.has(scannedTweet.parentUsername)
-          )
-        ) ||
-        _unifiedBlocklist.has(scannedTweet.username)
-      ) {
-        console.log(`Removed ${scannedTweet.username}'s tweet.`)
-        if (scannedTweet.type === 'quote-tweet' && !_unifiedBlocklist.has(scannedTweet.parentUsername)) {
-          while (scannedTweet.tweet.firstChild) {
-            scannedTweet.tweet.removeChild(scannedTweet.tweet.firstChild)
-          }
-          scannedTweet.tweet.style.display = 'flex'
-          scannedTweet.tweet.style.justifyContent = 'center'
-          scannedTweet.tweet.style.minHeight = '46px'
-          scannedTweet.tweet.style.paddingLeft = '12px'
-          scannedTweet.tweet.style.backgroundColor = '#16181c'
-          scannedTweet.tweet.style.pointerEvents = 'none'
+const muteSlop = async () => {
+  try {
+    const scannedTweets = scanTweets()
+    if (scannedTweets.length > 0) {
+      for (const scannedTweet of scannedTweets) {
+        if (
+          (
+            scannedTweet.type === 'quote-tweet' && (
+              _unifiedBlocklist.has(scannedTweet.username) ||
+              _unifiedBlocklist.has(scannedTweet.parentUsername)
+            )
+          ) ||
+          _unifiedBlocklist.has(scannedTweet.username)
+        ) {
+          console.log(`Removed ${scannedTweet.username}'s tweet.`)
+          if (scannedTweet.type === 'quote-tweet' && !_unifiedBlocklist.has(scannedTweet.parentUsername)) {
+            while (scannedTweet.tweet.firstChild) {
+              scannedTweet.tweet.removeChild(scannedTweet.tweet.firstChild)
+            }
+            scannedTweet.tweet.style.display = 'flex'
+            scannedTweet.tweet.style.justifyContent = 'center'
+            scannedTweet.tweet.style.minHeight = '46px'
+            scannedTweet.tweet.style.paddingLeft = '12px'
+            scannedTweet.tweet.style.backgroundColor = '#16181c'
+            scannedTweet.tweet.style.pointerEvents = 'none'
 
-          const notifier = document.createElement('span')
-          notifier.innerHTML = 'This Post is from an account muted by <b>SlopMuter</b>.'
-          notifier.style.fontFamily = 'TwitterChirp, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
-          notifier.style.color = '#71767b'
-          scannedTweet.tweet.appendChild(notifier)
-        } else {
-          const nodeToRemove = scannedTweet.type === 'quote-tweet' ? scannedTweet.parentTweet.parentNode?.parentNode : scannedTweet.tweet.parentNode?.parentNode
-          if (nodeToRemove && nodeToRemove.parentNode) {
-            nodeToRemove.parentNode.removeChild(nodeToRemove)
+            const notifier = document.createElement('span')
+            notifier.innerHTML = 'This Post is from an account muted by <b>SlopMuter</b>.'
+            notifier.style.fontFamily = 'TwitterChirp, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'
+            notifier.style.color = '#71767b'
+            scannedTweet.tweet.appendChild(notifier)
+          } else {
+            const nodeToRemove = scannedTweet.type === 'quote-tweet' ? scannedTweet.parentTweet.parentNode?.parentNode : scannedTweet.tweet.parentNode?.parentNode
+            if (nodeToRemove && nodeToRemove.parentNode) {
+              nodeToRemove.parentNode.removeChild(nodeToRemove)
+            }
           }
+          adapter.execute('incrementRemovedTweetCount', { by: 1 }).then(({ status, payload }) => {
+            if (!status) xonsole.warn('muteSlop.incrementRemovedTweetCount', payload, { by: 1 })
+            console.log('content:refreshRemovedTweetCount')
+            port.postMessage({ type: INTERNAL_MESSAGE_ACTIONS.refreshRemovedTweetCount })
+          })
         }
       }
+      adapter.execute('incrementScannedTweetCount', { by: scannedTweets.length }).then(({ status, payload }) => {
+        if (!status) xonsole.warn('muteSlop.incrementScannedTweetCount', payload, { by: scannedTweets.length })
+        console.log('content:refreshScannedTweetCount')
+        port.postMessage({ type: INTERNAL_MESSAGE_ACTIONS.refreshScannedTweetCount })
+      })
     }
+  } catch (error) {
+    xonsole.error('muteSlop', error as Error, {})
   }
 }
 
