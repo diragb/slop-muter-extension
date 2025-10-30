@@ -77,25 +77,51 @@ const scanTweets = (): Array<ScannedTweet> => {
   const tweets = document.querySelectorAll('[data-testid="tweet"]')
 
   for (let tweet of tweets) {
-    const _tweet = tweet
+    const _tweet = tweet as HTMLElement
 
     try {
       const socialContextNode = tweet.children[0].children[0].children[0] as HTMLElement
+      // const tweetContentNode = tweet.children[0].children[0].children[1].children[1] as HTMLElement
+      // const tweetHeaderNode = tweetContentNode.children[0] as HTMLElement
+      // const isReplyingTo = (tweetContentNode.children[1] as HTMLElement).innerText.includes('Replying to')
+      // const tweetBodyNode = tweetContentNode.children[1 + (isReplyingTo ? 1 : 0)] as HTMLElement
+      // const hasRepostedContent = (tweetContentNode.children[2 + (isReplyingTo ? 1 : 0)] as HTMLElement).getElementsByTagName('button').length === 0
+      // const tweetRepostNode = hasRepostedContent ? tweetContentNode.children[2 + (isReplyingTo ? 1 : 0)] as HTMLElement : null
+      // const tweetActionsNode = tweetContentNode.children[3 + (isReplyingTo ? 1 : 0) + (hasRepostedContent ? 0 : -1)] as HTMLElement
+
       const isReposted = (socialContextNode.innerText ?? '').length > 0
       let parentUsername = '', username = '', type: ScannedTweet['type'] = 'tweet'
       let parentTweet: HTMLElement | null = null
+
+      const child = tweet?.querySelectorAll('[tabindex="0"]')[0] as HTMLElement | null, childBounds = child ? child.getBoundingClientRect() : null
+      const MAX_BADGE_SIZE_IN_PIXELS = 20
+      const hasBadge = childBounds === null ? false : childBounds.width === childBounds.height && childBounds.width < MAX_BADGE_SIZE_IN_PIXELS
 
       if (isReposted) type = 'repost'
       const isQuoteTweet = tweet?.querySelectorAll('[data-testid="Tweet-User-Avatar"]').length > 1
 
       if (isQuoteTweet) {
-        parentUsername = tweet?.querySelectorAll('[data-testid="User-Name"]')[0].children[1].getElementsByTagName('a')[0].innerText?.slice(1)
+        parentUsername = tweet?.querySelectorAll('[data-testid="User-Name"]')[0]?.children[1].getElementsByTagName('a')[0].innerText?.slice(1)
         parentTweet = tweet as HTMLElement
-        tweet = tweet?.querySelectorAll('[tabindex="0"]')[0]
+
+        const childrenWithTabIndex0 = tweet?.querySelectorAll('[tabindex="0"]')
+        for (let scanIndex = hasBadge ? 1 : 0; scanIndex < childrenWithTabIndex0.length; scanIndex++) {
+          const tweetCandidate = childrenWithTabIndex0[scanIndex] as HTMLElement
+          if (
+            tweetCandidate.innerText.length > 0 &&
+            tweetCandidate.parentElement?.dataset.testid !== 'videoComponent' &&
+            tweetCandidate.role !== 'slider' && tweetCandidate.role === 'link' &&
+            (tweetCandidate.previousSibling as HTMLElement | null)?.dataset.testid !== 'icon-verified'
+          ) {
+            tweet = tweetCandidate
+            break
+          }
+        }
+
         username = (tweet?.querySelectorAll('[data-testid="User-Name"]')[0]?.querySelectorAll('[tabindex="-1"]')[0] as HTMLElement).innerText?.slice(1)
         type = 'quote-tweet'
       } else {
-        username = tweet?.querySelectorAll('[data-testid="User-Name"]')[0].children[1].getElementsByTagName('a')[0].innerText?.slice(1)
+        username = tweet?.querySelectorAll('[data-testid="User-Name"]')[0]?.children[1].getElementsByTagName('a')[0].innerText?.slice(1)
       }
 
       if (type === 'quote-tweet') {
@@ -113,8 +139,13 @@ const scanTweets = (): Array<ScannedTweet> => {
           type,
         })
       }
+
+      _tweet.setAttribute('data-slop-scan-status', 'scanned')
     } catch (error) {
       xonsole.warn('scanTweets', error as Error, { _tweet })
+      _tweet.setAttribute('data-slop-scan-status', 'failed')
+      // if (import.meta.env.WXT_ENVIRONMENT === 'local') _tweet.style.background = 'red'
+      _tweet.style.background = 'red'
     } finally {
       _tweet.setAttribute('data-testid', 'scanned-tweet')
     }
