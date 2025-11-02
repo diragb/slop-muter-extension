@@ -7,8 +7,8 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     permissions: ['storage', 'activeTab'],
-    name: 'Slop Muter',
-    short_name: 'Slop Muter',
+    name: 'SlopMuter',
+    short_name: 'SlopMuter',
     description: 'Browser extension that automatically blocks slop posts on your X/Twitter feed.',
     version: '0.1.0',
     author: {

@@ -1,5 +1,5 @@
 <div align="center">
-  <img style="margin-bottom: 12px;" src="https://raw.githubusercontent.com/diragb/slop-muter-webapp/refs/heads/main/public/twitter-image.jpg" alt="Slop Muter Cover">
+  <img style="margin-bottom: 12px;" src="https://raw.githubusercontent.com/diragb/slop-muter-webapp/refs/heads/main/public/twitter-image.jpg" alt="SlopMuter Cover">
 
   # SlopMuter Extension
 
