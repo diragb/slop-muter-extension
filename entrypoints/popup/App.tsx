@@ -1,5 +1,5 @@
 // Packages:
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Adapter from '@/utils/adapter'
 import xonsole from '@/utils/xonsole'
 import millify from 'millify'

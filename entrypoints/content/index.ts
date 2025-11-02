@@ -250,7 +250,7 @@ const refreshIsCurrentSessionUserBlocked = async ({ isBlocked }: { isBlocked: bo
 
 // Exports:
 export default defineContentScript({
-  matches: ['*://*.x.com/*'],
+  matches: ['*://*.x.com/*', '*://*.twitter.com/*'],
   main() {
     initialize().then(({ status: initializeStatus, payload: initializePayload }) => {
       if (!initializeStatus) throw initializePayload
