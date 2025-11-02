@@ -9,7 +9,7 @@ export default defineConfig({
     permissions: ['storage', 'activeTab'],
     name: 'Slop Muter',
     short_name: 'Slop Muter',
-    description: 'Browser extension that blocks slop posts on your X/Twitter feed for you.',
+    description: 'Browser extension that automatically blocks slop posts on your X/Twitter feed.',
     version: '0.1.0',
     author: {
       email: 'hey@diragb.dev'

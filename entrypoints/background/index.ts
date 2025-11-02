@@ -508,6 +508,90 @@ const incrementRemovedTweetCount = async ({
   }
 }
 
+const getCurrentSessionUsername = async (): (Promise<Returnable<Returnable<{
+  value: string
+  wasNull: 'yes' | 'no'
+}, {
+  value: string
+  wasNull: 'indeterminate'
+}>, Error>>) => {
+  try {
+    return returnable.success(await get<string>({
+      key: KEYS.currentSessionUsername,
+      defaultValue: '',
+      onNull: () => set({
+        key: KEYS.currentSessionUsername,
+        value: '',
+      }),
+      processor: username => JSON.parse(username)
+    }))
+  } catch (error) {
+    xonsole.warn('getCurrentSessionUsername', error as Error, { })
+    return returnable.fail(error as Error)
+  }
+}
+
+const setCurrentSessionUsername = async ({
+  username,
+}: {
+  username: string
+}): Promise<Returnable<undefined, Error>> => {
+  try {
+    const result = await set({
+      key: KEYS.currentSessionUsername,
+      value: username,
+    })
+
+    if (!result.status) throw result.payload
+    else return returnable.success(result.payload)
+  } catch (error) {
+    xonsole.warn('setCurrentSessionUsername', error as Error, { username })
+    return returnable.fail(error as Error)
+  }
+}
+
+const getIsCurrentSessionUserBlocked = async (): (Promise<Returnable<Returnable<{
+  value: boolean
+  wasNull: 'yes' | 'no'
+}, {
+  value: boolean
+  wasNull: 'indeterminate'
+}>, Error>>) => {
+  try {
+    return returnable.success(await get<boolean>({
+      key: KEYS.isCurrentSessionUserBlocked,
+      defaultValue: false,
+      onNull: () => set({
+        key: KEYS.isCurrentSessionUserBlocked,
+        value: false,
+      }),
+      processor: isBlocked => JSON.parse(isBlocked)
+    }))
+  } catch (error) {
+    xonsole.warn('getIsCurrentSessionUserBlocked', error as Error, { })
+    return returnable.fail(error as Error)
+  }
+}
+
+const setIsCurrentSessionUserBlocked = async ({
+  isBlocked,
+}: {
+  isBlocked: boolean
+}): Promise<Returnable<undefined, Error>> => {
+  try {
+    const result = await set({
+      key: KEYS.isCurrentSessionUserBlocked,
+      value: isBlocked,
+    })
+
+    if (!result.status) throw result.payload
+    else return returnable.success(result.payload)
+  } catch (error) {
+    xonsole.warn('setIsCurrentSessionUserBlocked', error as Error, { isBlocked })
+    return returnable.fail(error as Error)
+  }
+}
+
 // Exports:
 export default defineBackground(() => {
   let popupPort: globalThis.Browser.runtime.Port, contentScriptPort: globalThis.Browser.runtime.Port
@@ -564,6 +648,18 @@ export default defineBackground(() => {
       case INTERNAL_MESSAGE_ACTIONS.incrementRemovedTweetCount:
         incrementRemovedTweetCount(request.payload).then(sendResponse)
         return true
+      case INTERNAL_MESSAGE_ACTIONS.getCurrentSessionUsername:
+        getCurrentSessionUsername().then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.setCurrentSessionUsername:
+        setCurrentSessionUsername(request.payload).then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.getIsCurrentSessionUserBlocked:
+        getIsCurrentSessionUserBlocked().then(sendResponse)
+        return true
+      case INTERNAL_MESSAGE_ACTIONS.setIsCurrentSessionUserBlocked:
+        setIsCurrentSessionUserBlocked(request.payload).then(sendResponse)
+        return true
     }
   })
 
@@ -572,10 +668,9 @@ export default defineBackground(() => {
     if (port.name === 'content-script') contentScriptPort = port
   
     port.onMessage.addListener(request => {
-      if (port === contentScriptPort && popupPort) {
-        console.log('background:', request)
-        popupPort.postMessage(request)
-      }
+      try {
+        if (port === contentScriptPort && popupPort) popupPort.postMessage(request)
+      } catch {}
     })
   })
   

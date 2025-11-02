@@ -18,6 +18,8 @@ export const KEYS = {
   unifiedBlocklist: 'unified-blocklist',
   scannedTweetCount: 'scanned-tweet-count',
   removedTweetCount: 'removed-tweet-count',
+  currentSessionUsername: 'current-session-username',
+  isCurrentSessionUserBlocked: 'is-current-session-user-blocked',
 } as const
 
 export const get = async <T = null>({

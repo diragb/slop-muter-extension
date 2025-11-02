@@ -19,4 +19,10 @@ export const INTERNAL_MESSAGE_ACTIONS = {
   getRemovedTweetCount: 'getRemovedTweetCount',
   incrementRemovedTweetCount: 'incrementRemovedTweetCount',
   refreshRemovedTweetCount: 'refreshRemovedTweetCount',
+  getCurrentSessionUsername: 'getCurrentSessionUsername',
+  setCurrentSessionUsername: 'setCurrentSessionUsername',
+  refreshCurrentSessionUsername: 'refreshCurrentSessionUsername',
+  getIsCurrentSessionUserBlocked: 'getIsCurrentSessionUserBlocked',
+  setIsCurrentSessionUserBlocked: 'setIsCurrentSessionUserBlocked',
+  refreshIsCurrentSessionUserBlocked: 'refreshIsCurrentSessionUserBlocked',
 } as const

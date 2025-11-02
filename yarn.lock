@@ -3935,6 +3935,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"millify@npm:^6.1.0":
+  version: 6.1.0
+  resolution: "millify@npm:6.1.0"
+  dependencies:
+    yargs: "npm:^17.0.1"
+  bin:
+    millify: bin/millify
+  checksum: 10c0/a73fc2fdfaf07d5759913427b1f9d2db7fc3cb7cbc085ed9cf94bdd6425d8d4e0feb8a2a2497edfc5d6afe995bbb97237b4f6460c24cb7f4a2785bc1fb99131f
+  languageName: node
+  linkType: hard
+
 "mimic-fn@npm:^2.1.0":
   version: 2.1.0
   resolution: "mimic-fn@npm:2.1.0"
@@ -5088,6 +5099,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"simplur@npm:^4.0.0":
+  version: 4.0.0
+  resolution: "simplur@npm:4.0.0"
+  checksum: 10c0/69e3763db21d7969e3beab9e21b2555e63ee25b3427ebd3f4e719cf2ee150c9ecb8bcea923f9274603737e0a817001182a9b5e48bdf84b163f26d5cc24fb5ece
+  languageName: node
+  linkType: hard
+
 "sisteransi@npm:^1.0.5":
   version: 1.0.5
   resolution: "sisteransi@npm:1.0.5"
@@ -5131,8 +5149,10 @@ __metadata:
     clsx: "npm:^2.1.1"
     cmdk: "npm:^1.1.1"
     lucide-react: "npm:^0.548.0"
+    millify: "npm:^6.1.0"
     react: "npm:^19.1.1"
     react-dom: "npm:^19.1.1"
+    simplur: "npm:^4.0.0"
     tailwind-merge: "npm:^3.3.1"
     tailwindcss: "npm:^4.1.16"
     tw-animate-css: "npm:^1.4.0"
@@ -6065,7 +6085,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"yargs@npm:^17.5.1":
+"yargs@npm:^17.0.1, yargs@npm:^17.5.1":
   version: 17.7.2
   resolution: "yargs@npm:17.7.2"
   dependencies:

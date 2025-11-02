@@ -34,7 +34,7 @@ const adapter = new Adapter()
 const port = browser.runtime.connect({ name: 'content-script' })
 
 // Variables:
-let _unifiedBlocklist = new Set<string>()
+let _unifiedBlocklist = new Set<string>(), _currentSessionUsername = ''
 
 // Functions:
 
@@ -145,8 +145,7 @@ const scanTweets = (): Array<ScannedTweet> => {
     } catch (error) {
       xonsole.warn('scanTweets', error as Error, { _tweet })
       _tweet.setAttribute('data-slop-scan-status', 'failed')
-      // if (import.meta.env.WXT_ENVIRONMENT === 'local') _tweet.style.background = 'red'
-      _tweet.style.background = 'red'
+      if (import.meta.env.WXT_ENVIRONMENT === 'local') _tweet.style.background = 'red'
     } finally {
       _tweet.setAttribute('data-testid', 'scanned-tweet')
     }
@@ -169,7 +168,7 @@ const muteSlop = async () => {
           ) ||
           _unifiedBlocklist.has(scannedTweet.username)
         ) {
-          console.log(`Removed ${scannedTweet.username}'s tweet.`)
+          if (import.meta.env.WXT_ENVIRONMENT === 'local') console.log(`Removed ${scannedTweet.username}'s tweet.`)
           if (scannedTweet.type === 'quote-tweet' && !_unifiedBlocklist.has(scannedTweet.parentUsername)) {
             while (scannedTweet.tweet.firstChild) {
               scannedTweet.tweet.removeChild(scannedTweet.tweet.firstChild)
@@ -194,15 +193,17 @@ const muteSlop = async () => {
           }
           adapter.execute('incrementRemovedTweetCount', { by: 1 }).then(({ status, payload }) => {
             if (!status) xonsole.warn('muteSlop.incrementRemovedTweetCount', payload, { by: 1 })
-            console.log('content:refreshRemovedTweetCount')
-            port.postMessage({ type: INTERNAL_MESSAGE_ACTIONS.refreshRemovedTweetCount })
+            try {
+              port.postMessage({ type: INTERNAL_MESSAGE_ACTIONS.refreshRemovedTweetCount })
+            } catch {}
           })
         }
       }
       adapter.execute('incrementScannedTweetCount', { by: scannedTweets.length }).then(({ status, payload }) => {
         if (!status) xonsole.warn('muteSlop.incrementScannedTweetCount', payload, { by: scannedTweets.length })
-        console.log('content:refreshScannedTweetCount')
-        port.postMessage({ type: INTERNAL_MESSAGE_ACTIONS.refreshScannedTweetCount })
+        try {
+          port.postMessage({ type: INTERNAL_MESSAGE_ACTIONS.refreshScannedTweetCount })
+        } catch {}
       })
     }
   } catch (error) {
@@ -219,9 +220,32 @@ const refreshUnifiedBlocklist = async () => {
     if (!generateAndUpdateUnifiedBlocklistStatus) throw generateAndUpdateUnifiedBlocklistPayload
 
     _unifiedBlocklist = new Set(generateAndUpdateUnifiedBlocklistPayload)
+    if (_currentSessionUsername) refreshIsCurrentSessionUserBlocked({ isBlocked: _unifiedBlocklist.has(_currentSessionUsername) })
   } catch (error) {
     xonsole.error('refreshUnifiedBlocklist', error as Error, {})
   }
+}
+
+const setAndRefreshCurrentSessionUsername = async ({ username }: { username: string }) => {
+  try {
+    adapter.execute('setCurrentSessionUsername', { username }).then(({ status, payload }) => {
+      if (!status) xonsole.warn('setCurrentSessionUsername', payload, { username })
+      try {
+        port.postMessage({ type: INTERNAL_MESSAGE_ACTIONS.refreshCurrentSessionUsername })
+      } catch {}
+    })
+  } catch {}
+}
+
+const refreshIsCurrentSessionUserBlocked = async ({ isBlocked }: { isBlocked: boolean }) => {
+  try {
+    adapter.execute('setIsCurrentSessionUserBlocked', { isBlocked }).then(({ status, payload }) => {
+      if (!status) xonsole.warn('setIsCurrentSessionUserBlocked', payload, { isBlocked })
+      try {
+        port.postMessage({ type: INTERNAL_MESSAGE_ACTIONS.refreshCurrentSessionUsername })
+      } catch {}
+    })
+  } catch {}
 }
 
 // Exports:
@@ -232,7 +256,8 @@ export default defineContentScript({
       if (!initializeStatus) throw initializePayload
       _unifiedBlocklist = initializePayload
 
-      let previousURL = window.location.href
+      let previousURL = window.location.href, isUsernameObserverRegistered = false
+
       const URLObserver = new MutationObserver(() => {
         const currentURL = window.location.href
         if (currentURL !== previousURL) {
@@ -249,9 +274,36 @@ export default defineContentScript({
           previousURL = currentURL
         }
       })
+
+      const usernameObserver = new MutationObserver(() => {
+        const currentUsername = (document.querySelectorAll('[data-testid="SideNav_AccountSwitcher_Button"]')[0]?.querySelectorAll('[tabindex="-1"]')[0] as HTMLElement | null)?.innerText.slice(1)
+        if (currentUsername && currentUsername !== _currentSessionUsername) {
+          _currentSessionUsername = currentUsername
+          setAndRefreshCurrentSessionUsername({ username: currentUsername })
+          refreshIsCurrentSessionUserBlocked({ isBlocked: _unifiedBlocklist.has(_currentSessionUsername) })
+        }
+      })
+
+      const registerUsernameObserver = () => {
+        if (!isUsernameObserverRegistered) {
+          const usernameNode = document.querySelectorAll('[data-testid="SideNav_AccountSwitcher_Button"]')[0]?.querySelectorAll('[tabindex="-1"]')[0]
+          if (usernameNode) {
+            usernameObserver.observe(usernameNode, { subtree: true, childList: true })
+            const currentUsername = (usernameNode as HTMLElement)?.innerText.slice(1)
+            if (currentUsername && currentUsername !== _currentSessionUsername) {
+              _currentSessionUsername = currentUsername
+              setAndRefreshCurrentSessionUsername({ username: currentUsername })
+              refreshIsCurrentSessionUserBlocked({ isBlocked: _unifiedBlocklist.has(_currentSessionUsername) })
+            }
+            isUsernameObserverRegistered = true
+          }
+        }
+      }
       
       URLObserver.observe(document, { subtree: true, childList: true })
+      
       window.addEventListener('scroll', muteSlop)
+      window.addEventListener('scroll', registerUsernameObserver)
 
       browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
         switch (request.type) {

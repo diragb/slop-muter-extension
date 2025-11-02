@@ -1,6 +1,6 @@
 {
   "name": "slop-muter",
-  "description": "Browser extension that blocks slop posts on your X/Twitter feed for you.",
+  "description": "Browser extension that automatically blocks slop posts on your X/Twitter feed.",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -37,8 +37,10 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "lucide-react": "^0.548.0",
+    "millify": "^6.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "simplur": "^4.0.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.16"
   },

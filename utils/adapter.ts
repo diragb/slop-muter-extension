@@ -135,6 +135,46 @@ export interface IAdapter {
     payload: undefined
     result: undefined
   }
+  getCurrentSessionUsername: {
+    payload: undefined
+    result: Returnable<{
+      value: string
+      wasNull: 'yes' | 'no'
+    }, {
+      value: string
+      wasNull: 'indeterminate'
+    }>
+  }
+  setCurrentSessionUsername: {
+    payload: {
+      username: string
+    }
+    result: undefined
+  }
+  refreshCurrentSessionUsername: {
+    payload: undefined
+    result: undefined
+  }
+  getIsCurrentSessionUserBlocked: {
+    payload: undefined
+    result: Returnable<{
+      value: boolean
+      wasNull: 'yes' | 'no'
+    }, {
+      value: boolean
+      wasNull: 'indeterminate'
+    }>
+  }
+  setIsCurrentSessionUserBlocked: {
+    payload: {
+      isBlocked: boolean
+    }
+    result: undefined
+  }
+  refreshIsCurrentSessionUserBlocked: {
+    payload: undefined
+    result: undefined
+  }
 }
 
 // Constants:
