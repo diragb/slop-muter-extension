@@ -3,27 +3,13 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 // Assets:
-import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react'
+import { CheckIcon, SearchIcon } from 'lucide-react'
 
 // Components:
-import { Button } from '@/components/ui/button'
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 // Functions:
-const BlocklistCombobox = ({
+const BlocklistList = ({
   blocklists,
   selectedBlocklistIDs,
   deleteBlocklistID,
@@ -35,63 +21,71 @@ const BlocklistCombobox = ({
   addBlocklistID: (blocklistID: string) => void
 }) => {
   // State:
-  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+
+  // Constants:
+  const filtered = blocklists.filter(b =>
+    b.name.toLowerCase().includes(search.toLowerCase()) ||
+    b.description.toLowerCase().includes(search.toLowerCase())
+  )
 
   // Return:
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant='outline'
-          role='combobox'
-          aria-expanded={open}
-          className='w-full justify-between cursor-pointer'
-        >
-          <span className='text-[13px]'>Add blocklist filters</span>
-          <ChevronsUpDownIcon className='ml-2 h-4 w-4 shrink-0 opacity-50' />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className='w-[300px] p-0 font-[Inter]'>
-        <Command>
-          <CommandInput className='text-[13px]' placeholder='Search blocklists...' />
-          <CommandList>
-            <CommandEmpty className='text-[13px] p-2'>No blocklists found.</CommandEmpty>
-            <CommandGroup className='py-0'>
-              <ScrollArea className='h-48'>
-                {blocklists.map(blocklist => (
-                  <CommandItem
-                    key={blocklist.id}
-                    value={blocklist.id}
-                    onSelect={currentValue => {
-                      if (selectedBlocklistIDs.includes(currentValue)) deleteBlocklistID(currentValue)
-                      else addBlocklistID(currentValue)
-                    }}
-                    className='flex items-start flex-col gap-1 my-1 cursor-pointer transition-all'
-                  >
-                    <div className='flex items-center gap-1.5'>
-                      <span className='text-[13px] font-semibold'>
-                        {blocklist.name}
-                      </span>
-                      <CheckIcon
-                        className={cn(
-                          'size-4',
-                          selectedBlocklistIDs.includes(blocklist.id) ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
-                    </div>
-                    <div className='text-xs text-[11px]'>
-                      {blocklist.description}
-                    </div>
-                  </CommandItem>
-                ))}
-              </ScrollArea>
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <div className='flex flex-col gap-2'>
+      {/* Search input */}
+      <div className='relative'>
+        <SearchIcon className='absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-neutral-400 pointer-events-none' />
+        <input
+          type='text'
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder='Search blocklists...'
+          className='w-full h-8 pl-8 pr-3 text-[13px] text-neutral-700 placeholder:text-neutral-400 bg-white border border-neutral-200 rounded-lg outline-none transition-colors focus:border-neutral-300 focus:ring-1 focus:ring-neutral-200'
+        />
+      </div>
+
+      {/* Blocklist items */}
+      <ScrollArea className='h-61'>
+        <div className='flex flex-col gap-0.5'>
+          {filtered.length === 0 && (
+            <p className='py-3 text-center text-[13px] text-neutral-400'>No blocklists found.</p>
+          )}
+          {filtered.map(blocklist => {
+            const isSelected = selectedBlocklistIDs.includes(blocklist.id)
+            return (
+              <button
+                key={blocklist.id}
+                type='button'
+                onClick={() => {
+                  if (isSelected) deleteBlocklistID(blocklist.id)
+                  else addBlocklistID(blocklist.id)
+                }}
+                className='flex items-start gap-2.5 w-full px-2.5 py-2 text-left rounded-lg cursor-pointer transition-colors hover:bg-neutral-50'
+              >
+                <div className={cn(
+                  'flex items-center justify-center size-4 mt-0.5 rounded border shrink-0 transition-colors',
+                  isSelected
+                    ? 'bg-neutral-950 border-neutral-950'
+                    : 'bg-white border-neutral-300',
+                )}>
+                  {isSelected && <CheckIcon className='size-3 text-white' />}
+                </div>
+                <div className='flex flex-col gap-0.5 min-w-0'>
+                  <span className='text-[13px] font-medium text-neutral-950 leading-tight'>
+                    {blocklist.name}
+                  </span>
+                  <span className='text-[11px] leading-relaxed text-neutral-500'>
+                    {blocklist.description}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </ScrollArea>
+    </div>
   )
 }
 
 // Exports:
-export default BlocklistCombobox
+export default BlocklistList
